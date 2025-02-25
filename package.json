@@ -1,0 +1,39 @@
+{
+  "name": "tecnobot",
+  "version": "1.0.0",
+  "description": "WhatsApp chatbot with AI capabilities and Supabase integration",
+  "main": "src/app.js",
+  "type": "module",
+  "scripts": {
+    "dev": "nodemon src/app.js",
+    "start": "node src/app.js",
+    "lint": "eslint src/**/*.js",
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "postinstall": "npm install --os=win32 --cpu=x64 sharp"
+  },
+  "keywords": [
+    "whatsapp",
+    "chatbot",
+    "ai",
+    "supabase"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@builderbot/bot": "^1.0.0",
+    "@builderbot/provider-baileys": "^1.0.0",
+    "@supabase/supabase-js": "^2.39.3",
+    "dotenv": "^16.4.1",
+    "openai": "^4.85.4",
+    "optional": "^0.1.4",
+    "paquete": "^1.0.0",
+    "sharp": "^0.33.5"
+  },
+  "devDependencies": {
+    "eslint": "^8.57.0",
+    "nodemon": "^3.0.3"
+  },
+  "optionalDependencies": {
+    "sharp-win32-x64": "^0.33.5"
+  }
+}
