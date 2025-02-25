@@ -1,7 +1,7 @@
 <p align="center">
   <a href="https://builderbot.vercel.app/">
     <picture>
-      <img src="https://builderbot.vercel.app/assets/thumbnail-vector.png" height="80">
+      <img src="https://credigestor.com/assets/credigestor.svg" height="80">
     </picture>
     <h2 align="center">BuilderBot</h2>
   </a>
