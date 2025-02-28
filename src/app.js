@@ -21,7 +21,10 @@ const main = async () => {
     try {
         console.log('Initializing bot...')
         
-        // Initialize flows
+        const adapterProvider = createProvider(Provider)
+        const adapterDB = new Database()
+
+        // Initialize flows with provider
         console.log('Creating flows...')
         const flows = [
             {
@@ -31,7 +34,7 @@ const main = async () => {
             },
             {
                 name: 'ai-chat',
-                flow: createAIChatFlow(),
+                flow: createAIChatFlow(adapterProvider), // Pasar el provider
                 priority: 2
             }
         ]
@@ -53,9 +56,6 @@ const main = async () => {
             // Agregar el flujo dinámico como último flujo
             await createDynamicFlows()
         ].filter(Boolean))
-
-        const adapterProvider = createProvider(Provider)
-        const adapterDB = new Database()
 
         const { handleMsg, handleCtx, httpServer } = await createBot({
             flow: adapterFlow,
