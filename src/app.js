@@ -3,6 +3,7 @@ import { createBot, createProvider, createFlow, EVENTS } from '@builderbot/bot'
 import { MemoryDB as Database } from '@builderbot/bot'
 import { BaileysProvider as Provider } from '@builderbot/provider-baileys'
 import dotenv from 'dotenv'
+import { BlacklistService } from './services/database/blacklist.js'
 
 // Import flows
 import { createDataCollectionFlow } from './flows/data-collection/index.js'
@@ -148,15 +149,32 @@ const main = async () => {
             })
         )
 
+        // Actualizar el endpoint de blacklist
         adapterProvider.server.post(
             '/v1/blacklist',
             handleCtx(async (bot, req, res) => {
-                const { number, intent } = req.body
-                if (intent === 'remove') bot.blacklist.remove(number)
-                if (intent === 'add') bot.blacklist.add(number)
+                const { number, chatbotId, userId, action } = req.body
 
-                res.writeHead(200, { 'Content-Type': 'application/json' })
-                return res.end(JSON.stringify({ status: 'ok', number, intent }))
+                try {
+                    if (action === 'add') {
+                        await BlacklistService.addToBlacklist(userId, chatbotId, number)
+                    } else if (action === 'remove') {
+                        await BlacklistService.removeFromBlacklist(chatbotId, number)
+                    }
+
+                    res.writeHead(200, { 'Content-Type': 'application/json' })
+                    return res.end(JSON.stringify({ 
+                        status: 'success', 
+                        message: `Number ${action === 'add' ? 'added to' : 'removed from'} blacklist`,
+                        number 
+                    }))
+                } catch (error) {
+                    res.writeHead(500, { 'Content-Type': 'application/json' })
+                    return res.end(JSON.stringify({ 
+                        status: 'error', 
+                        message: error.message 
+                    }))
+                }
             })
         )
 

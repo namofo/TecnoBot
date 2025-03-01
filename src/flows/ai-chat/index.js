@@ -8,6 +8,7 @@ import { WelcomeService } from '../../services/database/welcomes.js'
 import AudioTranscriber from '../../services/ai/audio-transcriber.js'
 import TextToSpeechService from '../../services/ai/text-to-speech.js'
 import fs from 'fs'
+import { BlacklistService } from '../../services/database/blacklist.js'
 
 // Constantes para configuración
 const CONFIG = {
@@ -46,6 +47,22 @@ export const createAIChatFlow = (adapterProvider) => {
             try {
                 console.log('🤖 IA: Iniciando procesamiento de mensaje')
 
+                // Verificación temprana de blacklist
+                const phoneNumber = ctx.from.replace('@s.whatsapp.net', '')
+                const chatbot = await ChatbotService.getActiveChatbotByPhone(phoneNumber)
+                
+                if (!chatbot) {
+                    console.log('❌ No se encontró chatbot para:', phoneNumber)
+                    return endFlow()
+                }
+
+                // Verificar blacklist antes de cualquier procesamiento
+                const isBlacklisted = await BlacklistService.isBlacklisted(chatbot.id, phoneNumber)
+                if (isBlacklisted === true) {
+                    console.log('🚫 MENSAJE BLOQUEADO - Número en lista negra:', phoneNumber)
+                    return endFlow()
+                }
+
                 // Si estamos en medio de una recolección de datos, no intervenir
                 const currentState = state.getMyState()
                 if (currentState && Object.keys(currentState).length > 0) {
@@ -75,18 +92,8 @@ export const createAIChatFlow = (adapterProvider) => {
                     userMessage = ctx.body?.toLowerCase().trim()
                 }
 
-                const phoneNumber = ctx.from.replace('@s.whatsapp.net', '')
-
                 if (!ctx?.from) {
                     console.error('❌ Contexto inválido')
-                    return endFlow()
-                }
-
-                // Obtener el chatbot activo
-                const chatbot = await retry(() => ChatbotService.getActiveChatbotByPhone(phoneNumber), CONFIG.MAX_RETRIES)
-
-                if (!chatbot) {
-                    console.log('❌ No se encontró chatbot activo')
                     return endFlow()
                 }
 
