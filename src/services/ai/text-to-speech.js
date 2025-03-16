@@ -31,7 +31,7 @@ class TextToSpeechService {
                 input: { text },
                 voice: {
                     languageCode: 'es-US',
-                    name: 'es-US-Neural2-B', // Voz masculina
+                    name: 'es-US-Standard-B', // Voz masculina ESTÁNDAR mas economica = es-US-Standard-B ó Voz masculina Wavenet = mas costosa es-US-Neural2-B*
                     ssmlGender: 'MALE'
                 },
                 audioConfig: {
