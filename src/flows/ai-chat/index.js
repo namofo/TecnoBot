@@ -49,7 +49,7 @@ export const createAIChatFlow = (adapterProvider) => {
 
                 // Verificación temprana de blacklist
                 const phoneNumber = ctx.from.replace('@s.whatsapp.net', '')
-                const chatbot = await ChatbotService.getActiveChatbotByPhone(phoneNumber)
+                const chatbot = await ChatbotService.getActiveChatbotForPort(phoneNumber)
                 
                 if (!chatbot) {
                     console.log('❌ No se encontró chatbot para:', phoneNumber)

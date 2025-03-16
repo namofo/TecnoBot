@@ -1,44 +1,29 @@
 import supabase from '../../config/supabase.js'
-import { TABLES, ERROR_MESSAGES } from '../../config/constants.js'
-import { validators } from '../../utils/validators.js'
+import { TABLES } from '../../config/constants.js'
 
 export const ClientDataService = {
     async createClientData(userId, chatbotId, clientData) {
-        // Validate client data
-        const validation = validators.validateClientData(clientData)
-        if (!validation.isValid) {
-            throw new Error(validation.errors.join(', '))
+        try {
+            const { phone_number, ...formData } = clientData
+
+            const { data, error } = await supabase
+                .from(TABLES.CLIENT_DATA)
+                .insert({
+                    user_id: userId,
+                    chatbot_id: chatbotId,
+                    phone_number: phone_number,
+                    form_data: formData,
+                    created_at: new Date()
+                })
+                .select()
+                .single()
+
+            if (error) throw error
+            return data
+        } catch (error) {
+            console.error('Error creating client data:', error)
+            throw error
         }
-
-        // Check for existing client with same identification
-        const { data: existing } = await supabase
-            .from(TABLES.CLIENT_DATA)
-            .select('id')
-            .eq('chatbot_id', chatbotId)
-            .eq('identification_number', clientData.identification_number)
-            .single()
-
-        if (existing) {
-            throw new Error(ERROR_MESSAGES.DUPLICATE_ENTRY)
-        }
-
-        // Create new client data
-        const { data, error } = await supabase
-            .from(TABLES.CLIENT_DATA)
-            .insert({
-                user_id: userId,
-                chatbot_id: chatbotId,
-                identification_number: clientData.identification_number,
-                full_name: clientData.full_name,
-                phone_number: clientData.phone_number,
-                email: clientData.email,
-                media_url: clientData.media_url
-            })
-            .select()
-            .single()
-
-        if (error) throw new Error(error.message)
-        return data
     },
 
     async getClientByPhone(chatbotId, phoneNumber) {
@@ -84,5 +69,15 @@ export const ClientDataService = {
 
         if (error) throw new Error(error.message)
         return data
+    },
+
+    async getAllClientData() {
+        const { data, error } = await supabase
+            .from(TABLES.CLIENT_DATA)
+            .select('*')
+            .order('created_at', { ascending: false })
+
+        if (error) throw new Error(error.message)
+        return data || []
     }
-} 
+}

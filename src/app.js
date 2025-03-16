@@ -4,6 +4,7 @@ import { MemoryDB as Database } from '@builderbot/bot'
 import { BaileysProvider as Provider } from '@builderbot/provider-baileys'
 import dotenv from 'dotenv'
 import { BlacklistService } from './services/database/blacklist.js'
+import { PortAssignmentService } from './services/database/port-assignment.js'
 
 // Import flows
 import { createDataCollectionFlow } from './flows/data-collection/index.js'
@@ -13,7 +14,7 @@ import { createDynamicFlows } from './flows/dynamic/index.js'
 // Load environment variables
 dotenv.config()
 
-const PORT = process.env.PORT ?? 3008
+const PORT = process.env.PORT ?? 3010
 
 // Set para trackear mensajes procesados
 const processedMessages = new Set()
@@ -21,6 +22,16 @@ const processedMessages = new Set()
 const main = async () => {
     try {
         console.log('Initializing bot...')
+        
+        // Validar asignación de puerto
+        const port = process.env.PORT || 3010
+        const userId = await PortAssignmentService.getUserIdByPort(port)
+        
+        if (!userId) {
+            throw new Error(`No hay user_id asignado para el puerto ${port}`)
+        }
+
+        console.log(`✅ Bot iniciando en puerto ${port} para user_id: ${userId}`)
         
         const adapterProvider = createProvider(Provider)
         const adapterDB = new Database()
@@ -30,12 +41,12 @@ const main = async () => {
         const flows = [
             {
                 name: 'data-collection',
-                flow: createDataCollectionFlow(),
+                flow: createDataCollectionFlow(), // Ya no es async
                 priority: 1
             },
             {
                 name: 'ai-chat',
-                flow: createAIChatFlow(adapterProvider), // Pasar el provider
+                flow: createAIChatFlow(adapterProvider),
                 priority: 2
             }
         ]
@@ -49,14 +60,11 @@ const main = async () => {
                 return f.flow
             })
 
-        console.log(`Total base flows added: ${validFlows.length}`)
-        
         // Crear el flujo principal
-        const adapterFlow = createFlow([
-            ...validFlows,
-            // Agregar el flujo dinámico como último flujo
-            await createDynamicFlows()
-        ].filter(Boolean))
+        const dynamicFlows = await createDynamicFlows() // Este sí es async
+        const allFlows = [...validFlows, dynamicFlows].filter(Boolean)
+
+        const adapterFlow = createFlow(allFlows)
 
         const { handleMsg, handleCtx, httpServer } = await createBot({
             flow: adapterFlow,

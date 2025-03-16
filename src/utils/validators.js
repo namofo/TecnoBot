@@ -73,5 +73,24 @@ export const validators = {
             isValid: errors.length === 0,
             errors
         }
+    },
+
+    validateField(field, value) {
+        if (!value || value.trim() === '') {
+            return false
+        }
+
+        switch (field.validation_type) {
+            case 'text':
+                return value.length > 0
+            case 'email':
+                return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)
+            case 'number':
+                return !isNaN(value) && value.length > 0
+            case 'phone':
+                return /^\d{10,}$/.test(value)
+            default:
+                return true
+        }
     }
-} 
+}

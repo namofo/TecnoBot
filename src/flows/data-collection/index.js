@@ -1,113 +1,108 @@
 import { addKeyword } from '@builderbot/bot'
 import { ClientDataService } from '../../services/database/clients.js'
 import { ChatbotService } from '../../services/database/chatbots.js'
-import { validators } from '../../utils/validators.js'
+import { FormFieldsService } from '../../services/database/form-fields.js'
+import { FormMessagesService } from '../../services/database/form-messages.js'
 
 export const createDataCollectionFlow = () => {
     return addKeyword(['registro', 'registrar', 'registrarme'])
-        .addAnswer([
-            '📝 Iniciemos tu registro. Por favor, sigue las instrucciones.',
-            '❗ En cualquier momento puedes escribir "cancelar" para detener el proceso.',
-            'Ingresa tu número de identificación (solo números):'
-        ])
+        .addAction(async (ctx, { flowDynamic, state }) => {
+            const chatbot = await ChatbotService.getActiveChatbotForPort()
+            if (!chatbot) {
+                await flowDynamic('❌ Servicio no disponible')
+                return
+            }
+
+            try {
+                // Obtener mensajes configurados
+                const messages = await FormMessagesService.getFormMessages(chatbot.id)
+                console.log('Mensajes obtenidos:', messages)
+
+                // Obtener campos configurados
+                const formFields = await FormFieldsService.getFormFields(chatbot.id)
+                if (!formFields.length) {
+                    await flowDynamic('❌ Formulario no configurado')
+                    return
+                }
+
+                // Inicializar estado
+                await state.update({
+                    currentField: 0,
+                    fields: formFields,
+                    answers: {},
+                    messages: messages
+                })
+
+                // Enviar mensaje de bienvenida y primer campo
+                await flowDynamic(messages.welcome_message)
+                await flowDynamic(formFields[0].field_label)
+            } catch (error) {
+                console.error('Error en inicio de registro:', error)
+                await flowDynamic('❌ Error al iniciar el registro')
+            }
+        })
         .addAnswer(
             '',
             { capture: true },
             async (ctx, { fallBack, state, endFlow, flowDynamic }) => {
-                const input = ctx.body.trim().toLowerCase()
-                const currentState = state.getMyState() || { step: 'identification' }
+                const currentState = state.getMyState()
+                const input = ctx.body.trim()
 
-                // Verificar cancelación en cualquier paso
-                if (input === 'cancelar') {
+                if (input.toLowerCase() === 'cancelar') {
                     await state.clear()
-                    await flowDynamic([
-                        '🚫 Registro cancelado.',
-                        'Si deseas intentarlo de nuevo, escribe "registrarme".',
-                        'O puedes preguntarme cualquier otra cosa.'
-                    ])
+                    await flowDynamic(currentState.messages.cancel_message)
                     return endFlow()
                 }
 
-                // Manejar cada paso del registro
-                switch (currentState.step) {
-                    case 'identification':
-                        if (!validators.isValidIdentification(input)) {
-                            await fallBack('❌ El número de identificación debe contener solo números. Por favor, intenta nuevamente.')
-                            return
-                        }
-                        await state.update({ 
-                            ...currentState,
-                            step: 'name',
-                            identification: input 
-                        })
-                        return fallBack('Ingresa tu nombre completo (nombre y apellido):')
+                const currentField = currentState.fields[currentState.currentField]
+                
+                // Validar respuesta
+                const isValid = await FormFieldsService.validateField(
+                    input, 
+                    currentField.validation_type
+                )
 
-                    case 'name':
-                        if (!validators.isValidFullName(input)) {
-                            await fallBack('❌ Por favor ingresa tu nombre completo (nombre y apellido).')
-                            return
-                        }
-                        await state.update({ 
-                            ...currentState,
-                            step: 'email',
-                            fullName: input 
-                        })
-                        return fallBack('Ingresa tu correo electrónico:')
-
-                    case 'email':
-                        if (!validators.isValidEmail(input)) {
-                            await fallBack('❌ El formato del correo electrónico no es válido. Por favor, intenta nuevamente.')
-                            return
-                        }
-
-                        try {
-                            const chatbot = await ChatbotService.getActiveChatbotByPhone(ctx.from)
-                            if (!chatbot) {
-                                await flowDynamic('❌ Lo siento, ocurrió un error en el registro. No se encontró un chatbot activo.')
-                                await state.clear()
-                                return endFlow()
-                            }
-
-                            const clientData = {
-                                identification_number: currentState.identification,
-                                full_name: currentState.fullName,
-                                phone_number: ctx.from,
-                                email: input
-                            }
-
-                            const validation = validators.validateClientData(clientData)
-                            if (!validation.isValid) {
-                                await flowDynamic([
-                                    '❌ Lo siento, hay errores en los datos:',
-                                    validation.errors.join('\n')
-                                ])
-                                await state.clear()
-                                return endFlow()
-                            }
-
-                            await ClientDataService.createClientData(chatbot.user_id, chatbot.id, clientData)
-
-                            await flowDynamic([
-                                '✅ Datos registrados correctamente:',
-                                `📋 Identificación: ${clientData.identification_number}`,
-                                `👤 Nombre: ${clientData.full_name}`,
-                                `📧 Email: ${clientData.email}`,
-                                `📱 Teléfono: ${clientData.phone_number}`,
-                                '\n¡Gracias por registrarte! 🎉'
-                            ])
-
-                        } catch (error) {
-                            console.error('Error saving client data:', error)
-                            await flowDynamic('❌ Lo siento, ocurrió un error al guardar tus datos. Por favor, intenta nuevamente más tarde.')
-                        }
-
-                        await state.clear()
-                        return endFlow()
-
-                    default:
-                        await state.clear()
-                        return endFlow()
+                if (!isValid) {
+                    return fallBack('❌ Respuesta no válida. Intenta nuevamente.')
                 }
+
+                // Guardar respuesta
+                currentState.answers[currentField.field_name] = input
+
+                // Verificar si hay más campos
+                if (currentState.currentField < currentState.fields.length - 1) {
+                    currentState.currentField++
+                    await state.update(currentState)
+                    return fallBack(currentState.fields[currentState.currentField].field_label)
+                }
+
+                // Guardar datos
+                try {
+                    const chatbot = await ChatbotService.getActiveChatbotForPort()
+                    const formAnswers = currentState.answers
+
+                    // Asegurar que el nombre se guarde correctamente
+                    if (formAnswers.nombres) {
+                        formAnswers.full_name = formAnswers.nombres
+                    }
+
+                    await ClientDataService.createClientData(
+                        chatbot.user_id,
+                        chatbot.id,
+                        {
+                            ...formAnswers,
+                            phone_number: ctx.from
+                        }
+                    )
+
+                    await flowDynamic(currentState.messages.success_message)
+                } catch (error) {
+                    console.error('Error saving data:', error)
+                    await flowDynamic('❌ Error al guardar los datos')
+                }
+
+                await state.clear()
+                return endFlow()
             }
         )
 }

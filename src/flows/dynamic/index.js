@@ -57,7 +57,7 @@ export const createDynamicFlows = async () => {
             }
 
             // Obtener el chatbot activo
-            const chatbot = await ChatbotService.getActiveChatbotByPhone(ctx.from)
+            const chatbot = await ChatbotService.getActiveChatbotForPort()
             console.log('🤖 Chatbot encontrado:', chatbot?.id)
 
             if (!chatbot) {
@@ -138,4 +138,4 @@ export const createDynamicFlows = async () => {
 
     console.log('Flujo dinámico base creado ✅')
     return mainFlow
-} 
+}

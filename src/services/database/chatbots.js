@@ -1,5 +1,6 @@
 import supabase from '../../config/supabase.js'
 import { TABLES, ERROR_MESSAGES } from '../../config/constants.js'
+import { PortAssignmentService } from './port-assignment.js'
 
 export const ChatbotService = {
     async createChatbot(userId, name, description = '') {
@@ -78,52 +79,32 @@ export const ChatbotService = {
         return true
     },
 
-    async getActiveChatbotByPhone(phoneNumber) {
-        // Clean phone number
-        const cleanPhone = phoneNumber.replace('@s.whatsapp.net', '')
-        console.log('Looking for chatbot for phone:', cleanPhone)
+    async getActiveChatbotForPort() {
+        try {
+            const port = process.env.PORT || 3010
+            const userId = await PortAssignmentService.getUserIdByPort(port)
 
-        // First try to get the chatbot from chat history
-        const { data: historyData, error: historyError } = await supabase
-            .from(TABLES.CHAT_HISTORY)
-            .select(`
-                chatbot:${TABLES.CHATBOTS}!inner(*)
-            `)
-            .eq('phone_number', cleanPhone)
-            .eq('chatbot.is_active', true)
-            .order('created_at', { ascending: false })
-            .limit(1)
-            .single()
+            if (!userId) {
+                console.error('No se encontró user_id para el puerto:', port)
+                return null
+            }
 
-        if (historyData?.chatbot) {
-            console.log('Found chatbot from history:', historyData.chatbot.id)
-            return historyData.chatbot
-        }
+            // Modificación: Obtener el chatbot más reciente si hay varios
+            const { data: chatbots, error } = await supabase
+                .from('chatbots')
+                .select('*')
+                .eq('user_id', userId)
+                .eq('is_active', true)
+                .order('created_at', { ascending: false })
+                .limit(1)
 
-        // If no chat history found, get the MOST RECENT default active chatbot
-        console.log('No chat history found, getting most recent active chatbot...')
-        const { data: activeBots, error: activeBotsError } = await supabase
-            .from(TABLES.CHATBOTS)
-            .select('*')
-            .eq('is_active', true)
-            .order('created_at', { ascending: false })
-
-        if (activeBotsError) {
-            console.error('Error getting active chatbots:', activeBotsError)
-            throw new Error(activeBotsError.message)
-        }
-
-        if (activeBots && activeBots.length > 0) {
-            // Log all active bots for debugging
-            console.log('Found active chatbots:', activeBots.map(bot => `${bot.id} (${bot.name_chatbot})`))
+            if (error) throw error
             
-            // Return only the most recent one
-            const mostRecent = activeBots[0]
-            console.log('Using most recent chatbot:', mostRecent.id, mostRecent.name_chatbot)
-            return mostRecent
+            // Retornar el primer chatbot (el más reciente)
+            return chatbots?.[0] || null
+        } catch (error) {
+            console.error('Error getting active chatbot:', error)
+            return null
         }
-
-        console.log('No active chatbots found')
-        return null
     }
-} 
+}
