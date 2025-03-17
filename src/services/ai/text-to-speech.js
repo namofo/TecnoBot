@@ -2,23 +2,19 @@ import { TextToSpeechClient } from '@google-cloud/text-to-speech'
 import fs from 'fs'
 import path from 'path'
 import util from 'util'
+import dotenv from 'dotenv'
+
+dotenv.config()
 
 class TextToSpeechService {
     constructor() {
-        // Usar path.join para construir la ruta absoluta
-        const credentialsPath = path.join(
-            process.cwd(),
-            'apigoogle',
-            'tecnochattextovoz-0b6dd14bacf5.json'
-        )
-
-        // Verificar si existe el archivo de credenciales
-        if (!fs.existsSync(credentialsPath)) {
-            throw new Error(`Archivo de credenciales no encontrado en: ${credentialsPath}`)
-        }
-
+        // Usar credenciales desde variables de entorno
         this.client = new TextToSpeechClient({
-            keyFilename: credentialsPath
+            credentials: {
+                client_email: process.env.GOOGLE_CLIENT_EMAIL,
+                private_key: process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
+                project_id: process.env.GOOGLE_PROJECT_ID
+            }
         })
         console.log('✅ TextToSpeechService inicializado')
     }
